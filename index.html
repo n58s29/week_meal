@@ -172,4 +172,268 @@
 <script>
   // URL de l’API fournie
   const API_URL =
-    "https://data.nantesmetropole.fr/api/
+    "https://data.nantesmetropole.fr/api/explore/v2.1/catalog/datasets/244400404_menus-cantines-scolaires-nantes-metropole/records?limit=200";
+
+  // 👉 Si tu veux filtrer une commune ou une école en particulier,
+  // tu peux ajouter un filtre dans le code plus bas (fonction filterItemForChild).
+
+  document.addEventListener("DOMContentLoaded", () => {
+    loadMenus();
+  });
+
+  async function loadMenus() {
+    const statusEl = document.getElementById("status");
+    const container = document.getElementById("week");
+
+    try {
+      statusEl.textContent = "Chargement des menus...";
+      const response = await fetch(API_URL);
+      if (!response.ok) {
+        throw new Error("Statut HTTP " + response.status);
+      }
+
+      const data = await response.json();
+      console.log("Données brutes API :", data); // pratique pour les ajustements
+
+      const rawResults = data.results || data.records || [];
+      if (!rawResults.length) {
+        statusEl.textContent = "Aucun menu trouvé dans l’API.";
+        return;
+      }
+
+      // Certains jeux Opendatasoft sont dans .fields, d’autres directement dans l’objet
+      const items = rawResults.map(r => (r.fields ? r.fields : r));
+
+      const dateField = detectDateField(items[0]);
+      if (!dateField) {
+        statusEl.textContent = "Impossible de détecter le champ date dans les données.";
+        console.error("Structure exemple :", items[0]);
+        return;
+      }
+
+      const withDates = items
+        .map((it) => {
+          const d = new Date(it[dateField]);
+          return {
+            ...it,
+            __dateObj: d,
+            __dateKey: !isNaN(d) ? d.toISOString().slice(0, 10) : null,
+          };
+        })
+        .filter((r) => r.__dateKey);
+
+      if (!withDates.length) {
+        statusEl.textContent = "Aucune date valide trouvée dans les menus.";
+        return;
+      }
+
+      // 👉 Filtre pour ne garder que les menus qui concernent ton enfant (à adapter au besoin)
+      const filteredForChild = withDates.filter(filterItemForChild);
+
+      const { weekStart, weekEnd } = getCurrentWeekBounds();
+      const weekItems = filteredForChild.filter(
+        (r) => r.__dateObj >= weekStart && r.__dateObj <= weekEnd
+      );
+
+      if (!weekItems.length) {
+        statusEl.textContent = "Pas de menus pour la semaine en cours dans l’API.";
+        return;
+      }
+
+      weekItems.sort((a, b) => a.__dateObj - b.__dateObj);
+
+      // Regroupement par jour
+      const byDay = new Map();
+      for (const item of weekItems) {
+        if (!byDay.has(item.__dateKey)) byDay.set(item.__dateKey, []);
+        byDay.get(item.__dateKey).push(item);
+      }
+
+      statusEl.textContent = "";
+      container.innerHTML = "";
+
+      for (const [dateKey, itemsOfDay] of byDay) {
+        const day = itemsOfDay[0].__dateObj;
+
+        const section = document.createElement("section");
+        section.className = "day-card";
+
+        const h2 = document.createElement("h2");
+        const weekdaySpan = document.createElement("span");
+        weekdaySpan.className = "weekday";
+        weekdaySpan.textContent = capitalize(
+          day.toLocaleDateString("fr-FR", { weekday: "long" })
+        );
+
+        const dateSpan = document.createElement("span");
+        dateSpan.className = "date";
+        dateSpan.textContent = day.toLocaleDateString("fr-FR", {
+          day: "numeric",
+          month: "long",
+        });
+
+        h2.appendChild(weekdaySpan);
+        h2.appendChild(dateSpan);
+        section.appendChild(h2);
+
+        const list = document.createElement("ul");
+        list.className = "menu-list";
+
+        itemsOfDay.forEach((item) => {
+          const li = document.createElement("li");
+          li.className = "menu-item";
+
+          const text = buildDescription(item, dateField);
+          const icons = guessIcons(text);
+
+          const iconSpan = document.createElement("span");
+          iconSpan.className = "icons";
+          iconSpan.textContent = icons;
+
+          const textSpan = document.createElement("span");
+          textSpan.textContent = text;
+
+          li.appendChild(iconSpan);
+          li.appendChild(textSpan);
+          list.appendChild(li);
+        });
+
+        section.appendChild(list);
+        container.appendChild(section);
+      }
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent =
+        "Erreur lors du chargement des menus. Regarde la console pour plus de détails.";
+    }
+  }
+
+  // Essaie de deviner quel champ contient la date
+  function detectDateField(item) {
+    if (!item) return null;
+    const keys = Object.keys(item);
+
+    // 1. Champs contenant "date"
+    const candidates = keys.filter((k) => /date/i.test(k));
+    for (const key of candidates) {
+      const v = item[key];
+      if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v)) {
+        return key;
+      }
+    }
+
+    // 2. Noms fréquents
+    const fallback = ["jour", "date_repas", "date_menu"];
+    for (const key of fallback) {
+      if (key in item) return key;
+    }
+
+    return candidates[0] || null;
+  }
+
+  // Filtre spécifique à ton enfant (à adapter si besoin)
+  function filterItemForChild(item) {
+    // Exemple : si le dataset contient un champ "commune" et/ou "ecole"
+    // tu peux décommenter et adapter :
+    //
+    // const commune = (item.commune || item.ville || "").toLowerCase();
+    // if (commune && commune !== "nantes") return false;
+    //
+    // const ecole = (item.nom_ecole || item.ecole || "").toLowerCase();
+    // if (ecole && !ecole.includes("nom de l'école".toLowerCase())) return false;
+    //
+    // Par défaut : on garde tout
+    return true;
+  }
+
+  // Bornes de la semaine actuelle (lundi -> dimanche)
+  function getCurrentWeekBounds() {
+    const now = new Date();
+    const weekStart = new Date(now);
+    weekStart.setHours(0, 0, 0, 0);
+    // JS : 0 = dimanche, 1 = lundi…
+    const day = (now.getDay() + 6) % 7; // lundi = 0
+    weekStart.setDate(weekStart.getDate() - day);
+
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+    return { weekStart, weekEnd };
+  }
+
+  function capitalize(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  }
+
+  // Construit une phrase à partir des champs texte (sauf la date, id, etc.)
+  function buildDescription(item, dateField) {
+    const ignoreKeys = new Set([
+      dateField,
+      "id",
+      "recordid",
+      "datasetid",
+      "record_timestamp",
+    ]);
+
+    const parts = [];
+    for (const [key, val] of Object.entries(item)) {
+      if (ignoreKeys.has(key)) continue;
+      if (val == null) continue;
+      if (typeof val !== "string") continue;
+      if (/^https?:\/\//.test(val)) continue;
+
+      const trimmed = val.trim();
+      if (!trimmed) continue;
+
+      parts.push(trimmed);
+    }
+
+    return parts.join(" · ") || "(détail du menu indisponible)";
+  }
+
+  // Devine des pictos à partir du texte
+  function guessIcons(text) {
+    const t = text.toLowerCase();
+    const icons = new Set();
+
+    const addIf = (keywords, icon) => {
+      if (keywords.some((k) => t.includes(k))) icons.add(icon);
+    };
+
+    addIf(["poisson", "saumon", "colin", "merlu", "cabillaud", "thon"], "🐟");
+    addIf(
+      ["boeuf", "bœuf", "steak", "viande", "porc", "saucisse", "lard", "jambon"],
+      "🥩"
+    );
+    addIf(["poulet", "dinde", "volaille"], "🍗");
+    addIf(
+      [
+        "légume",
+        "legume",
+        "carotte",
+        "haricot",
+        "courgette",
+        "brocoli",
+        "épinard",
+        "salade",
+        "tomate",
+        "chou",
+      ],
+      "🥦"
+    );
+    addIf(
+      ["pomme", "poire", "banane", "fruit", "ananas", "kiwi", "orange", "clémentine", "raisin"],
+      "🍎"
+    );
+    addIf(["fromage", "yaourt", "lait", "crème", "creme"], "🧀");
+    addIf(["riz", "pâtes", "pates", "semoule", "blé", "quinoa", "couscous"], "🍚");
+    addIf(["dessert", "gâteau", "gateau", "tarte", "mousse", "glace", "flan"], "🍰");
+    addIf(["soupe", "potage", "velouté", "veloute"], "🥣");
+    addIf(["végétar", "vegetar"], "🌱");
+
+    if (!icons.size) icons.add("🍽️");
+    return Array.from(icons).join(" ");
+  }
+</script>
+</body>
+</html>
