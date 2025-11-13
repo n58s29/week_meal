@@ -2,8 +2,9 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Menu cantine – Nantes Métropole</title>
+  <title>Menu cantine – Nantes (semaine)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
   <style>
     :root {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -151,11 +152,11 @@
 <body>
 <div class="page">
   <header>
-    <h1>🍽️ Menu de la cantine – semaine en cours</h1>
-    <p>Données en direct depuis l'API open data de Nantes Métropole.</p>
+    <h1>🍽️ Menu de la cantine – Nantes</h1>
+    <p>Semaine en cours · données open data Nantes Métropole.</p>
     <div class="badge">
       <span>🔄</span>
-      <span>Actualisé à chaque chargement de la page</span>
+      <span>Actualisé à chaque chargement</span>
     </div>
   </header>
 
@@ -164,18 +165,14 @@
   <div id="week" class="week-grid"></div>
 
   <p class="small-note">
-    Astuce : si rien n'apparaît, regarde la console du navigateur (F12) pour voir la structure exacte de l'API
-    et ajuster le code si besoin.
+    Astuce : ouvre la console (F12) pour voir les données brutes si tu veux filtrer par école, etc.
   </p>
 </div>
 
 <script>
-  // URL de l’API fournie
+  // URL fournie par toi (API v2.1)
   const API_URL =
-    "https://data.nantesmetropole.fr/api/explore/v2.1/catalog/datasets/244400404_menus-cantines-scolaires-nantes-metropole/records?limit=200";
-
-  // 👉 Si tu veux filtrer une commune ou une école en particulier,
-  // tu peux ajouter un filtre dans le code plus bas (fonction filterItemForChild).
+    "https://data.nantesmetropole.fr/api/explore/v2.1/catalog/datasets/244400404_menus-cantines-scolaires-nantes-metropole/records?limit=20";
 
   document.addEventListener("DOMContentLoaded", () => {
     loadMenus();
@@ -188,12 +185,13 @@
     try {
       statusEl.textContent = "Chargement des menus...";
       const response = await fetch(API_URL);
+
       if (!response.ok) {
         throw new Error("Statut HTTP " + response.status);
       }
 
       const data = await response.json();
-      console.log("Données brutes API :", data); // pratique pour les ajustements
+      console.log("Données brutes API :", data);
 
       const rawResults = data.results || data.records || [];
       if (!rawResults.length) {
@@ -201,13 +199,13 @@
         return;
       }
 
-      // Certains jeux Opendatasoft sont dans .fields, d’autres directement dans l’objet
+      // Sur Opendatasoft, les données sont souvent dans .fields
       const items = rawResults.map(r => (r.fields ? r.fields : r));
 
       const dateField = detectDateField(items[0]);
       if (!dateField) {
-        statusEl.textContent = "Impossible de détecter le champ date dans les données.";
-        console.error("Structure exemple :", items[0]);
+        statusEl.textContent = "Impossible de détecter le champ de date.";
+        console.error("Exemple de ligne :", items[0]);
         return;
       }
 
@@ -220,26 +218,27 @@
             __dateKey: !isNaN(d) ? d.toISOString().slice(0, 10) : null,
           };
         })
-        .filter((r) => r.__dateKey);
+        .filter(r => r.__dateKey);
 
       if (!withDates.length) {
         statusEl.textContent = "Aucune date valide trouvée dans les menus.";
         return;
       }
 
-      // 👉 Filtre pour ne garder que les menus qui concernent ton enfant (à adapter au besoin)
-      const filteredForChild = withDates.filter(filterItemForChild);
+      // 🔎 Filtre : on ne garde que Nantes
+      const onlyNantes = withDates.filter(filterNantes);
 
       const { weekStart, weekEnd } = getCurrentWeekBounds();
-      const weekItems = filteredForChild.filter(
+      const weekItems = onlyNantes.filter(
         (r) => r.__dateObj >= weekStart && r.__dateObj <= weekEnd
       );
 
       if (!weekItems.length) {
-        statusEl.textContent = "Pas de menus pour la semaine en cours dans l’API.";
+        statusEl.textContent = "Pas de menus pour la semaine en cours (Nantes).";
         return;
       }
 
+      // Tri par date
       weekItems.sort((a, b) => a.__dateObj - b.__dateObj);
 
       // Regroupement par jour
@@ -301,22 +300,21 @@
         section.appendChild(list);
         container.appendChild(section);
       }
-  } catch (err) {
-    console.error("Erreur détaillée :", err);
-    const statusEl = document.getElementById("status");
-    statusEl.textContent =
-      "Erreur lors du chargement des menus : " +
-      (err && err.message ? err.message : "voir console du navigateur (F12).");
-  }
+    } catch (err) {
+      console.error("Erreur détaillée :", err);
+      statusEl.textContent =
+        "Erreur lors du chargement des menus : " +
+        (err && err.message ? err.message : "voir console (F12).");
+    }
   }
 
-  // Essaie de deviner quel champ contient la date
+  // Essaie de deviner le champ de date (souvent 'jour' ou similaire)
   function detectDateField(item) {
     if (!item) return null;
     const keys = Object.keys(item);
 
-    // 1. Champs contenant "date"
-    const candidates = keys.filter((k) => /date/i.test(k));
+    // 1) Champs contenant "date" ou "jour"
+    const candidates = keys.filter((k) => /date|jour/i.test(k));
     for (const key of candidates) {
       const v = item[key];
       if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v)) {
@@ -324,7 +322,7 @@
       }
     }
 
-    // 2. Noms fréquents
+    // 2) quelques fallback
     const fallback = ["jour", "date_repas", "date_menu"];
     for (const key of fallback) {
       if (key in item) return key;
@@ -333,27 +331,34 @@
     return candidates[0] || null;
   }
 
-  // Filtre spécifique à ton enfant (à adapter si besoin)
-  function filterItemForChild(item) {
-  // Détection du champ commune / ville
-  const commune =
-    (item.commune ||
-     item.ville ||
-     item.nom_commune ||
-     item.libelle_commune ||
-     ""
-    ).toString().toLowerCase();
+  // Filtre pour ne garder que Nantes
+  function filterNantes(item) {
+    const commune =
+      (item.commune ||
+       item.ville ||
+       item.nom_commune ||
+       item.libelle_commune ||
+       ""
+      ).toString().toLowerCase();
 
-  // On ne garde que Nantes
-  return commune === "nantes";
-}
+    if (commune) {
+      return commune === "nantes";
+    }
 
-  // Bornes de la semaine actuelle (lundi -> dimanche)
+    // Si pas de champ "commune" clair, on cherche "nantes" partout
+    const texteComplet = Object.values(item)
+      .filter(v => typeof v === "string")
+      .join(" ")
+      .toLowerCase();
+
+    return texteComplet.includes("nantes");
+  }
+
+  // Lundi -> dimanche de la semaine actuelle
   function getCurrentWeekBounds() {
     const now = new Date();
     const weekStart = new Date(now);
     weekStart.setHours(0, 0, 0, 0);
-    // JS : 0 = dimanche, 1 = lundi…
     const day = (now.getDay() + 6) % 7; // lundi = 0
     weekStart.setDate(weekStart.getDate() - day);
 
@@ -367,7 +372,7 @@
     return str.charAt(0).toUpperCase() + str.slice(1);
   }
 
-  // Construit une phrase à partir des champs texte (sauf la date, id, etc.)
+  // Construit une phrase lisible à partir des champs texte (hors date / id / URLs)
   function buildDescription(item, dateField) {
     const ignoreKeys = new Set([
       dateField,
@@ -393,7 +398,7 @@
     return parts.join(" · ") || "(détail du menu indisponible)";
   }
 
-  // Devine des pictos à partir du texte
+  // Ajoute des pictos selon le texte
   function guessIcons(text) {
     const t = text.toLowerCase();
     const icons = new Set();
