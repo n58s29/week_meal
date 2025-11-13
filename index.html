@@ -301,11 +301,13 @@
         section.appendChild(list);
         container.appendChild(section);
       }
-    } catch (err) {
-      console.error(err);
-      statusEl.textContent =
-        "Erreur lors du chargement des menus. Regarde la console pour plus de détails.";
-    }
+  } catch (err) {
+    console.error("Erreur détaillée :", err);
+    const statusEl = document.getElementById("status");
+    statusEl.textContent =
+      "Erreur lors du chargement des menus : " +
+      (err && err.message ? err.message : "voir console du navigateur (F12).");
+  }
   }
 
   // Essaie de deviner quel champ contient la date
