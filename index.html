@@ -287,14 +287,17 @@
           li.className = "menu-item";
 
           const text = buildDescription(item, dateField);
-          const icons = guessIcons(text);
+          // On enlève les balises HTML pour deviner les pictos
+          const textForIcons = text.replace(/<[^>]+>/g, " ");
+          const icons = guessIcons(textForIcons);
 
           const iconSpan = document.createElement("span");
           iconSpan.className = "icons";
           iconSpan.textContent = icons;
 
           const textSpan = document.createElement("span");
-          textSpan.textContent = text;
+          // On injecte le HTML (les <p>, <br>… seront rendus correctement)
+          textSpan.innerHTML = text; 
 
           li.appendChild(iconSpan);
           li.appendChild(textSpan);
@@ -376,7 +379,6 @@
     return str.charAt(0).toUpperCase() + str.slice(1);
   }
 
-  // Construit une phrase lisible à partir des champs texte (hors date / id / URLs)
   function buildDescription(item, dateField) {
     const ignoreKeys = new Set([
       dateField,
@@ -384,22 +386,36 @@
       "recordid",
       "datasetid",
       "record_timestamp",
+      // on évite de répéter ces infos dans le texte
+      "commune",
+      "ville",
+      "nom_commune",
+      "libelle_commune",
+      "code_postal",
+      "code_insee",
+      "nom_ecole",
+      "ecole"
     ]);
-
+  
     const parts = [];
+  
     for (const [key, val] of Object.entries(item)) {
       if (ignoreKeys.has(key)) continue;
       if (val == null) continue;
       if (typeof val !== "string") continue;
       if (/^https?:\/\//.test(val)) continue;
-
+  
       const trimmed = val.trim();
       if (!trimmed) continue;
-
+  
+      // Certains champs sont déjà du HTML (<p>...</p>), d'autres juste du texte.
       parts.push(trimmed);
     }
-
-    return parts.join(" · ") || "(détail du menu indisponible)";
+  
+    // On sépare les morceaux par un <br><br> pour l’aération
+    const html = parts.join("<br><br>");
+  
+    return html || "(détail du menu indisponible)";
   }
 
   // Ajoute des pictos selon le texte
