@@ -333,18 +333,18 @@
 
   // Filtre spécifique à ton enfant (à adapter si besoin)
   function filterItemForChild(item) {
-    // Exemple : si le dataset contient un champ "commune" et/ou "ecole"
-    // tu peux décommenter et adapter :
-    //
-    // const commune = (item.commune || item.ville || "").toLowerCase();
-    // if (commune && commune !== "nantes") return false;
-    //
-    // const ecole = (item.nom_ecole || item.ecole || "").toLowerCase();
-    // if (ecole && !ecole.includes("nom de l'école".toLowerCase())) return false;
-    //
-    // Par défaut : on garde tout
-    return true;
-  }
+  // Détection du champ commune / ville
+  const commune =
+    (item.commune ||
+     item.ville ||
+     item.nom_commune ||
+     item.libelle_commune ||
+     ""
+    ).toString().toLowerCase();
+
+  // On ne garde que Nantes
+  return commune === "nantes";
+}
 
   // Bornes de la semaine actuelle (lundi -> dimanche)
   function getCurrentWeekBounds() {
