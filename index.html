@@ -565,6 +565,13 @@
       if (plain.length <= 2 && !/[a-zA-Z]/.test(plain)) continue;
       if (/^\d{4}-\d{2}-\d{2}$/.test(plain)) continue;
 
+      // Ignorer les lignes qui sont juste "Menu végétarien" ou "Menu standard"
+      if (/^Menu\s+(végétarien|vegetarien|standard|allergique)$/i.test(plain)) continue;
+      
+      // Ignorer les lignes très longues qui sont des résumés (contiennent plusieurs fois "Menu")
+      const menuCount = (plain.match(/Menu\s+(végétarien|vegetarien|standard)/gi) || []).length;
+      if (menuCount >= 2) continue;
+
       parts.push(trimmed);
     }
 
