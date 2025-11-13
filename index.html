@@ -398,6 +398,7 @@
         section.appendChild(h2);
 
         const menusByCategory = {};
+        const seenMenus = new Set(); // Pour éviter les doublons
 
         itemsOfDay.forEach(item => {
           const html = buildDescription(item, dateField);
@@ -407,6 +408,16 @@
           if (!plain.trim()) return;
 
           const category = categorizeMenu(plain);
+          
+          // Ignorer les menus allergiques
+          if (category === "Menu allergique") return;
+
+          // Créer une clé unique pour détecter les doublons
+          const menuKey = plain.toLowerCase().replace(/\s+/g, ' ').trim();
+          
+          // Si ce menu exact existe déjà, on le saute
+          if (seenMenus.has(menuKey)) return;
+          seenMenus.add(menuKey);
 
           if (!menusByCategory[category]) {
             menusByCategory[category] = [];
