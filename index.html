@@ -5,6 +5,9 @@
   <title>Menu cantine – Nantes (semaine)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
+  <!-- Petit favicon emoji pour éviter le 404 sur /favicon.ico -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍽️</text></svg>">
+
   <style>
     :root {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -170,9 +173,10 @@
 </div>
 
 <script>
-  // URL fournie par toi (API v2.1)
+  // 👉 On passe par l’API v1, plus simple et plus tolérante :
+  // https://data.nantesmetropole.fr/api/records/1.0/search/?dataset=244400404_menus-cantines-scolaires-nantes-metropole&rows=600&sort=jour
   const API_URL =
-    "https://data.nantesmetropole.fr/api/explore/v2.1/catalog/datasets/244400404_menus-cantines-scolaires-nantes-metropole/records?limit=600";
+    "https://data.nantesmetropole.fr/api/records/1.0/search/?dataset=244400404_menus-cantines-scolaires-nantes-metropole&rows=600";
 
   document.addEventListener("DOMContentLoaded", () => {
     loadMenus();
@@ -191,20 +195,20 @@
       }
 
       const data = await response.json();
-      console.log("Données brutes API :", data);
+      console.log("Données brutes API v1 :", data);
 
-      const rawResults = data.results || data.records || [];
+      const rawResults = data.records || [];
       if (!rawResults.length) {
         statusEl.textContent = "Aucun menu trouvé dans l’API.";
         return;
       }
 
-      // Sur Opendatasoft, les données sont souvent dans .fields
+      // Sur l’API v1 Opendatasoft : chaque record => { fields: {...}, ... }
       const items = rawResults.map(r => (r.fields ? r.fields : r));
 
       const dateField = detectDateField(items[0]);
       if (!dateField) {
-        statusEl.textContent = "Impossible de détecter le champ de date.";
+        statusEl.textContent = "Impossible de détecter le champ date.";
         console.error("Exemple de ligne :", items[0]);
         return;
       }
