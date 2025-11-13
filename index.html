@@ -2,16 +2,16 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Menu cantine – Nantes (semaine)</title>
+  <title>Menu de la cantine – Nantes (semaine)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- Petit favicon emoji pour éviter le 404 sur /favicon.ico -->
+  <!-- Petit favicon emoji -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍽️</text></svg>">
 
   <style>
     :root {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f3f4f6;
+      background: #e0f2fe;
       color: #111827;
     }
 
@@ -22,7 +22,7 @@
     }
 
     .page {
-      max-width: 1000px;
+      max-width: 1100px;
       margin: 0 auto;
       padding: 1.5rem 1rem 3rem;
     }
@@ -34,7 +34,7 @@
 
     header h1 {
       margin: 0;
-      font-size: 1.7rem;
+      font-size: 1.9rem;
     }
 
     header p {
@@ -47,7 +47,7 @@
       display: inline-flex;
       align-items: center;
       gap: 0.4rem;
-      background: rgba(37, 99, 235, 0.08);
+      background: rgba(37, 99, 235, 0.09);
       color: #1d4ed8;
       border-radius: 999px;
       padding: 0.25rem 0.75rem;
@@ -65,7 +65,7 @@
     .week-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-      gap: 1rem;
+      gap: 1.2rem;
     }
 
     .day-card {
@@ -74,7 +74,7 @@
       padding: 1rem 1.1rem;
       box-shadow:
         0 18px 40px rgba(15, 23, 42, 0.08),
-        0 0 0 1px rgba(148, 163, 184, 0.15);
+        0 0 0 1px rgba(148, 163, 184, 0.12);
       display: flex;
       flex-direction: column;
       gap: 0.6rem;
@@ -82,11 +82,12 @@
 
     .day-card h2 {
       margin: 0;
-      font-size: 1.05rem;
+      font-size: 1.02rem;
       text-transform: capitalize;
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: baseline;
+      gap: 0.5rem;
     }
 
     .day-card h2 span.date {
@@ -98,31 +99,40 @@
       color: #6b7280;
     }
 
-    .menu-list {
-      list-style: none;
-      margin: 0;
-      padding: 0;
+    .menus-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 0.6rem;
+      margin-top: 0.2rem;
+    }
+
+    .menu-block {
+      background: rgba(15, 23, 42, 0.02);
+      border-radius: 0.7rem;
+      padding: 0.5rem 0.6rem 0.55rem;
+      font-size: 0.86rem;
+      min-height: 3rem;
+    }
+
+    .menu-block-title {
+      font-weight: 600;
+      margin-bottom: 0.25rem;
       display: flex;
-      flex-direction: column;
-      gap: 0.45rem;
+      align-items: center;
+      gap: 0.25rem;
     }
 
-    .menu-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.35rem;
-      font-size: 0.9rem;
-      line-height: 1.3;
+    .menu-block-title .icons {
+      font-size: 1.1rem;
     }
 
-    .menu-item .icons {
-      flex-shrink: 0;
-      font-size: 1.2rem;
-      margin-top: -0.05rem;
+    .menu-block-body {
+      line-height: 1.35;
+      white-space: pre-line;
     }
 
-    .menu-item span:last-child {
-      color: #374151;
+    .menu-block-body p {
+      margin: 0 0 0.15rem;
     }
 
     .small-note {
@@ -149,6 +159,9 @@
       header p, #status, .small-note {
         color: #9ca3af;
       }
+      .menu-block {
+        background: rgba(148, 163, 184, 0.08);
+      }
     }
   </style>
 </head>
@@ -173,8 +186,7 @@
 </div>
 
 <script>
-  // 👉 On passe par l’API v1, plus simple et plus tolérante :
-  // https://data.nantesmetropole.fr/api/records/1.0/search/?dataset=244400404_menus-cantines-scolaires-nantes-metropole&rows=600&sort=jour
+  // API v1, plus tolérante, avec 600 menus max
   const API_URL =
     "https://data.nantesmetropole.fr/api/records/1.0/search/?dataset=244400404_menus-cantines-scolaires-nantes-metropole&rows=600";
 
@@ -203,7 +215,6 @@
         return;
       }
 
-      // Sur l’API v1 Opendatasoft : chaque record => { fields: {...}, ... }
       const items = rawResults.map(r => (r.fields ? r.fields : r));
 
       const dateField = detectDateField(items[0]);
@@ -229,7 +240,6 @@
         return;
       }
 
-      // 🔎 Filtre : on ne garde que Nantes
       const onlyNantes = withDates.filter(filterNantes);
 
       const { weekStart, weekEnd } = getCurrentWeekBounds();
@@ -242,10 +252,8 @@
         return;
       }
 
-      // Tri par date
       weekItems.sort((a, b) => a.__dateObj - b.__dateObj);
 
-      // Regroupement par jour
       const byDay = new Map();
       for (const item of weekItems) {
         if (!byDay.has(item.__dateKey)) byDay.set(item.__dateKey, []);
@@ -279,32 +287,57 @@
         h2.appendChild(dateSpan);
         section.appendChild(h2);
 
-        const list = document.createElement("ul");
-        list.className = "menu-list";
+        // 👉 Regrouper les menus par type (Standard / Végétarien / Allergique / Férié…)
+        const menusByCategory = {};
 
-        itemsOfDay.forEach((item) => {
-          const li = document.createElement("li");
-          li.className = "menu-item";
+        itemsOfDay.forEach(item => {
+          const html = buildDescription(item, dateField);
+          if (!html) return;
 
-          const text = buildDescription(item, dateField);
-          // On enlève les balises HTML pour deviner les pictos
-          const textForIcons = text.replace(/<[^>]+>/g, " ");
-          const icons = guessIcons(textForIcons);
+          const plain = stripTags(html);
+          if (!plain.trim()) return;
+
+          const category = categorizeMenu(plain);
+
+          if (!menusByCategory[category]) {
+            menusByCategory[category] = [];
+          }
+          menusByCategory[category].push({ html, plain });
+        });
+
+        const menusGrid = document.createElement("div");
+        menusGrid.className = "menus-grid";
+
+        Object.entries(menusByCategory).forEach(([category, menus]) => {
+          const allPlain = menus.map(m => m.plain).join(" ");
+          const icons = guessIcons(allPlain);
+
+          const block = document.createElement("div");
+          block.className = "menu-block";
+
+          const title = document.createElement("div");
+          title.className = "menu-block-title";
 
           const iconSpan = document.createElement("span");
           iconSpan.className = "icons";
           iconSpan.textContent = icons;
 
-          const textSpan = document.createElement("span");
-          // On injecte le HTML (les <p>, <br>… seront rendus correctement)
-          textSpan.innerHTML = text; 
+          const labelSpan = document.createElement("span");
+          labelSpan.textContent = category;
 
-          li.appendChild(iconSpan);
-          li.appendChild(textSpan);
-          list.appendChild(li);
+          title.appendChild(iconSpan);
+          title.appendChild(labelSpan);
+
+          const body = document.createElement("div");
+          body.className = "menu-block-body";
+          body.innerHTML = menus.map(m => m.html).join("<br><br>");
+
+          block.appendChild(title);
+          block.appendChild(body);
+          menusGrid.appendChild(block);
         });
 
-        section.appendChild(list);
+        section.appendChild(menusGrid);
         container.appendChild(section);
       }
     } catch (err) {
@@ -315,12 +348,11 @@
     }
   }
 
-  // Essaie de deviner le champ de date (souvent 'jour' ou similaire)
+  // Deviner le champ date
   function detectDateField(item) {
     if (!item) return null;
     const keys = Object.keys(item);
 
-    // 1) Champs contenant "date" ou "jour"
     const candidates = keys.filter((k) => /date|jour/i.test(k));
     for (const key of candidates) {
       const v = item[key];
@@ -329,7 +361,6 @@
       }
     }
 
-    // 2) quelques fallback
     const fallback = ["jour", "date_repas", "date_menu"];
     for (const key of fallback) {
       if (key in item) return key;
@@ -338,7 +369,7 @@
     return candidates[0] || null;
   }
 
-  // Filtre pour ne garder que Nantes
+  // Garder uniquement Nantes
   function filterNantes(item) {
     const commune =
       (item.commune ||
@@ -352,7 +383,6 @@
       return commune === "nantes";
     }
 
-    // Si pas de champ "commune" clair, on cherche "nantes" partout
     const texteComplet = Object.values(item)
       .filter(v => typeof v === "string")
       .join(" ")
@@ -379,6 +409,14 @@
     return str.charAt(0).toUpperCase() + str.slice(1);
   }
 
+  // Enlever les balises HTML
+  function stripTags(html) {
+    const tmp = document.createElement("div");
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || "";
+  }
+
+  // Construit un HTML propre à partir des champs texte, en évitant le bruit
   function buildDescription(item, dateField) {
     const ignoreKeys = new Set([
       dateField,
@@ -386,7 +424,6 @@
       "recordid",
       "datasetid",
       "record_timestamp",
-      // on évite de répéter ces infos dans le texte
       "commune",
       "ville",
       "nom_commune",
@@ -394,31 +431,45 @@
       "code_postal",
       "code_insee",
       "nom_ecole",
-      "ecole"
+      "ecole",
+      "code_site"
     ]);
-  
+
     const parts = [];
-  
+
     for (const [key, val] of Object.entries(item)) {
       if (ignoreKeys.has(key)) continue;
       if (val == null) continue;
       if (typeof val !== "string") continue;
       if (/^https?:\/\//.test(val)) continue;
-  
-      const trimmed = val.trim();
+
+      let trimmed = val.trim();
       if (!trimmed) continue;
-  
-      // Certains champs sont déjà du HTML (<p>...</p>), d'autres juste du texte.
+
+      // On ignore les tout petits bouts (codes, chiffres seuls...)
+      const plain = stripTags(trimmed);
+      if (plain.length <= 2 && !/[a-zA-Z]/.test(plain)) continue;
+
+      // On évite de répéter la date dans le texte
+      if (/^\d{4}-\d{2}-\d{2}$/.test(plain)) continue;
+
       parts.push(trimmed);
     }
-  
-    // On sépare les morceaux par un <br><br> pour l’aération
-    const html = parts.join("<br><br>");
-  
-    return html || "(détail du menu indisponible)";
+
+    const html = parts.join("<br>");
+    return html;
   }
 
-  // Ajoute des pictos selon le texte
+  // Déterminer le type de menu pour regrouper en colonnes
+  function categorizeMenu(plainText) {
+    const t = plainText.toLowerCase();
+    if (/férié|ferie/.test(t)) return "Férié";
+    if (/allergique/.test(t)) return "Menu allergique";
+    if (/végétar|vegetar/.test(t)) return "Menu végétarien";
+    return "Menu standard";
+  }
+
+  // Pictos selon le texte
   function guessIcons(text) {
     const t = text.toLowerCase();
     const icons = new Set();
